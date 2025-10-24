@@ -1,0 +1,58 @@
+cat > .gitignore << 'EOF'
+# Python
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Fotos (temporärer Speicher - nicht committen)
+static/photos/*.jpg
+static/photos/*.jpeg
+static/photos/*.png
+static/photos/*.gif
+
+# Aber den Ordner behalten
+!static/photos/.gitkeep
+
+# AI Models (zu groß für Git)
+*.pth
+*.onnx
+*.bin
+*.safetensors
+models/
+weights/
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Backups
+*.backup
+*.bak
+
+# Environment variables
+.env
+.env.local
+
+# Test files
+test_*.py
+scratch/
+EOF

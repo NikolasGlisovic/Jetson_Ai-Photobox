@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI PhotoBox</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .container {
+            text-align: center;
+            padding: 20px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+
+        #captureBtn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 30px 60px;
+            font-size: 2em;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            touch-action: manipulation;
+        }
+
+        #captureBtn:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+
+        #captureBtn:active {
+            transform: translateY(-2px);
+        }
+
+        #captureBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .countdown {
+            font-size: 8em;
+            font-weight: bold;
+            margin: 40px 0;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
+            display: none;
+        }
+
+        .photo-display {
+            margin-top: 40px;
+            display: none;
+        }
+
+        .photo-display img {
+            max-width: 100%;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
+
+        .action-buttons {
+            margin-top: 30px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .action-buttons button {
+            padding: 15px 40px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            touch-action: manipulation;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .action-buttons button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        .loading {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top: 5px solid white;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 1.2em;
+            min-height: 30px;
+        }
+
+        .error {
+            color: #ffcccc;
+            background: rgba(255,0,0,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="startScreen">
+            <h1>📸 AI PhotoBox</h1>
+            <p class="subtitle">Bereit für dein kreatives Foto?</p>
+            <button id="captureBtn">Foto aufnehmen</button>
+        </div>
+
+        <div class="countdown" id="countdown"></div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p class="status" id="status">Foto wird aufgenommen...</p>
+        </div>
+
+        <div class="photo-display" id="photoDisplay">
+            <img id="photoImg" src="" alt="Aufgenommenes Foto">
+            <div class="action-buttons">
+                <button class="btn-secondary" onclick="processWithAI()">🎨 Mit AI bearbeiten</button>
+                <button class="btn-primary" onclick="printPhoto()">🖨️ Drucken</button>
+                <button class="btn-danger" onclick="resetApp()">🔄 Neues Foto</button>
+            </div>
+        </div>
+
+        <div class="error" id="error" style="display: none;"></div>
+    </div>
+
+    <script>
+        let currentPhotoId = null;
+        let currentPhotoUrl = null;
+
+        document.getElementById('captureBtn').addEventListener('click', startCapture);
+
+        function startCapture() {
+            // UI vorbereiten
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('photoDisplay').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            
+            // Countdown starten
+            showCountdown();
+        }
+
+        function showCountdown() {
+            const countdownEl = document.getElementById('countdown');
+            countdownEl.style.display = 'block';
+            
+            let count = 3;
+            countdownEl.textContent = count;
+            
+            const interval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdownEl.textContent = count;
+                } else {
+                    clearInterval(interval);
+                    countdownEl.style.display = 'none';
+                    capturePhoto();
+                }
+            }, 1000);
+        }
+
+        async function capturePhoto() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('status').textContent = 'Foto wird aufgenommen...';
+            
+            try {
+                const response = await fetch('/api/capture', {
+                    method: 'POST',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentPhotoId = data.photo_id;
+                    currentPhotoUrl = data.url;
+                    
+                    // Warte kurz damit das Bild vollständig geschrieben ist
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
+                    showPhoto(data.url);
+                } else {
+                    showError('Fehler beim Aufnehmen: ' + data.error);
+                }
+            } catch (error) {
+                showError('Verbindungsfehler: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        function showPhoto(url) {
+            const photoImg = document.getElementById('photoImg');
+            // Cache-Busting mit Timestamp UND Random für neue Fotos
+            photoImg.src = url + '?t=' + Date.now() + '&r=' + Math.random();
+            document.getElementById('photoDisplay').style.display = 'block';
+        }
+
+        function processWithAI() {
+            alert('AI-Bearbeitung kommt in Schritt 2! 🎨');
+            // Wird später implementiert
+        }
+
+        function printPhoto() {
+            alert('Druck-Funktion kommt in Schritt 3! 🖨️');
+            // Wird später implementiert
+        }
+
+        function resetApp() {
+            currentPhotoId = null;
+            currentPhotoUrl = null;
+            document.getElementById('photoDisplay').style.display = 'none';
+            document.getElementById('startScreen').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            
+            // Bild-Cache leeren
+            document.getElementById('photoImg').src = '';
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            
+            // Zurück zum Start nach 5 Sekunden
+            setTimeout(resetApp, 5000);
+        }
+    </script>
+</body>
+</html>
