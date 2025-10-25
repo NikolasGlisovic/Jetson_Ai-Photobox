@@ -59,11 +59,28 @@ def capture_photo():
 
 @app.route('/api/preview')
 def get_preview():
-    """Live-Preview Frame holen (optional für später)"""
+    """Live-Preview Frame holen"""
     frame = get_camera().get_frame()
     if frame:
         return send_file(frame, mimetype='image/jpeg')
     return jsonify({'error': 'Kein Frame verfügbar'}), 500
+
+@app.route('/api/video_feed')
+def video_feed():
+    """Video-Stream für Live-Preview"""
+    def generate():
+        camera_instance = get_camera()
+        while True:
+            frame = camera_instance.get_frame()
+            if frame:
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame.getvalue() + b'\r\n')
+            else:
+                break
+    
+    from flask import Response
+    return Response(generate(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/api/photos')
 def list_photos():

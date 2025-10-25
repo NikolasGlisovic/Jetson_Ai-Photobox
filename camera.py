@@ -4,7 +4,7 @@ from io import BytesIO
 from PIL import Image
 
 class Camera:
-    def __init__(self, camera_index=0, width=1280, height=720):
+    def __init__(self, camera_index=0, width=1920, height=1080):
         """
         Kamera initialisieren
         

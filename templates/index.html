@@ -24,7 +24,7 @@
         .container {
             text-align: center;
             padding: 20px;
-            max-width: 800px;
+            max-width: 900px;
             width: 100%;
         }
 
@@ -69,12 +69,47 @@
             transform: none;
         }
 
-        .countdown {
-            font-size: 8em;
-            font-weight: bold;
-            margin: 40px 0;
-            text-shadow: 3px 3px 6px rgba(0,0,0,0.4);
+        .preview-container {
+            position: relative;
             display: none;
+            margin: 40px auto;
+            max-width: 640px;
+        }
+
+        .preview-container.active {
+            display: block;
+        }
+
+        #livePreview {
+            width: 100%;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            display: block;
+        }
+
+        .countdown-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0,0,0,0.3);
+            border-radius: 20px;
+        }
+
+        .countdown {
+            font-size: 10em;
+            font-weight: bold;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            animation: pulse 1s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
         }
 
         .photo-display {
@@ -160,6 +195,12 @@
             border-radius: 10px;
             margin-top: 20px;
         }
+
+        .camera-ready-text {
+            margin-top: 20px;
+            font-size: 1em;
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -168,13 +209,19 @@
             <h1>📸 AI PhotoBox</h1>
             <p class="subtitle">Bereit für dein kreatives Foto?</p>
             <button id="captureBtn">Foto aufnehmen</button>
+            <p class="camera-ready-text">Positioniere dich vor der Kamera</p>
         </div>
 
-        <div class="countdown" id="countdown"></div>
+        <div class="preview-container" id="previewContainer">
+            <img id="livePreview" src="/api/video_feed" alt="Live Vorschau">
+            <div class="countdown-overlay" id="countdownOverlay">
+                <div class="countdown" id="countdown"></div>
+            </div>
+        </div>
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p class="status" id="status">Foto wird aufgenommen...</p>
+            <p class="status" id="status">Foto wird verarbeitet...</p>
         </div>
 
         <div class="photo-display" id="photoDisplay">
@@ -192,6 +239,7 @@
     <script>
         let currentPhotoId = null;
         let currentPhotoUrl = null;
+        let countdownInterval = null;
 
         document.getElementById('captureBtn').addEventListener('click', startCapture);
 
@@ -200,33 +248,74 @@
             document.getElementById('startScreen').style.display = 'none';
             document.getElementById('photoDisplay').style.display = 'none';
             document.getElementById('error').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
             
-            // Countdown starten
-            showCountdown();
+            // Live-Preview anzeigen
+            const previewContainer = document.getElementById('previewContainer');
+            previewContainer.classList.add('active');
+            
+            // Preview laden (Cache-Busting)
+            const preview = document.getElementById('livePreview');
+            preview.src = '/api/video_feed?t=' + Date.now();
+            
+            // Kurze Verzögerung damit Preview laden kann
+            setTimeout(() => {
+                showCountdown();
+            }, 500);
         }
 
         function showCountdown() {
             const countdownEl = document.getElementById('countdown');
-            countdownEl.style.display = 'block';
+            const overlayEl = document.getElementById('countdownOverlay');
             
-            let count = 3;
+            overlayEl.style.display = 'flex';
+            
+            let count = 5;
             countdownEl.textContent = count;
             
-            const interval = setInterval(() => {
+            // Animation neu triggern
+            countdownEl.style.animation = 'none';
+            setTimeout(() => {
+                countdownEl.style.animation = 'pulse 1s ease-in-out';
+            }, 10);
+            
+            countdownInterval = setInterval(() => {
                 count--;
                 if (count > 0) {
                     countdownEl.textContent = count;
+                    // Animation neu starten für jeden Countdown
+                    countdownEl.style.animation = 'none';
+                    setTimeout(() => {
+                        countdownEl.style.animation = 'pulse 1s ease-in-out';
+                    }, 10);
                 } else {
-                    clearInterval(interval);
-                    countdownEl.style.display = 'none';
-                    capturePhoto();
+                    clearInterval(countdownInterval);
+                    countdownEl.textContent = '📸';
+                    
+                    // Nach kurzer Pause Foto aufnehmen
+                    setTimeout(() => {
+                        hidePreview();
+                        capturePhoto();
+                    }, 300);
                 }
             }, 1000);
         }
 
+        function hidePreview() {
+            const previewContainer = document.getElementById('previewContainer');
+            const overlayEl = document.getElementById('countdownOverlay');
+            
+            previewContainer.classList.remove('active');
+            overlayEl.style.display = 'none';
+            
+            // Stream stoppen
+            const preview = document.getElementById('livePreview');
+            preview.src = '';
+        }
+
         async function capturePhoto() {
             document.getElementById('loading').style.display = 'block';
-            document.getElementById('status').textContent = 'Foto wird aufgenommen...';
+            document.getElementById('status').textContent = 'Foto wird verarbeitet...';
             
             try {
                 const response = await fetch('/api/capture', {
@@ -274,11 +363,20 @@
         }
 
         function resetApp() {
+            // Countdown stoppen falls läuft
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+            }
+            
             currentPhotoId = null;
             currentPhotoUrl = null;
+            
+            hidePreview();
             document.getElementById('photoDisplay').style.display = 'none';
             document.getElementById('startScreen').style.display = 'block';
             document.getElementById('error').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
             
             // Bild-Cache leeren
             document.getElementById('photoImg').src = '';
@@ -289,9 +387,19 @@
             errorEl.textContent = message;
             errorEl.style.display = 'block';
             
+            // Preview ausblenden
+            hidePreview();
+            
             // Zurück zum Start nach 5 Sekunden
             setTimeout(resetApp, 5000);
         }
+
+        // Cleanup beim Verlassen
+        window.addEventListener('beforeunload', () => {
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+            }
+        });
     </script>
 </body>
 </html>
