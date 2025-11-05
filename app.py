@@ -4,8 +4,12 @@ import os
 from datetime import datetime
 from pathlib import Path
 import uuid
+import threading
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
+
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Konfiguration
 PHOTO_DIR = Path("static/photos")
@@ -127,7 +131,20 @@ def cleanup_old_photos():
         'deleted': deleted
     })
 
+def listen_button():
+    from inputs import get_gamepad
+    print("🎮  Warte auf physische Knopfdrücke...")
+    while True:
+        events = get_gamepad()
+        for event in events:
+            if event.ev_type == "Key" and event.state == 1:
+                print(f"Button gedrückt: {event.code}")
+                socketio.emit("button_pressed")   # 🔔 an Browser senden
+
+
 if __name__ == '__main__':
+
+    threading.Thread(target=listen_button, daemon=True).start()
     # Server starten
     # host='0.0.0.0' macht Server im Netzwerk erreichbar
     app.run(host='0.0.0.0', port=5000, debug=True)

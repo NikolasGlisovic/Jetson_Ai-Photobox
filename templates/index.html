@@ -401,5 +401,19 @@
             }
         });
     </script>
+
+    <!-- Socket.IO einbinden -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <!-- Verbindung & Event-Listener -->
+    <script>
+        const socket = io();
+
+        socket.on("button_pressed", () => {
+            console.log("🎮 Physischer Button ausgelöst!");
+            startCapture();   // löst denselben Ablauf aus wie Klick auf den UI-Button
+        });
+    </script>
+
 </body>
 </html>
