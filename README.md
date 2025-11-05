@@ -25,6 +25,7 @@ Development of a standalone photo booth that:
 ### Backend
 - **Python 3.10** with Flask
 - **OpenCV** for camera control
+- **Flask-SocketIO** for real-time hardware button events
 - **PyTorch** for AI inference (planned)
 - Filesystem-based image storage (no database)
 
@@ -32,6 +33,7 @@ Development of a standalone photo booth that:
 - **HTML/CSS/JavaScript** (Single Page Application)
 - Runs in browser (Chromium Kiosk mode)
 - Touch-optimized interface
+- Real-time integration with physical button via WebSocket
 
 ### Planned AI Integration
 - Stable Diffusion xl for image transformations
@@ -47,6 +49,7 @@ Development of a standalone photo booth that:
 - Responsive web interface
 - Camera buffer optimization for fresh frames
 - Cache-busting for correct image refresh
+- Physical Zero Delay Encoder button triggers countdown and photo capture via WebSocket
 - Temporary image storage in `static/photos/`
 
 ### 🔄 In Progress
