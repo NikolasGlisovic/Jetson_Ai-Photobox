@@ -148,7 +148,7 @@ python3 app.py
 - Image sharing: http://10.42.0.1:8080 (or your hotspot IP)
 
 **REMOTE from smartphone/tablet (via hotspot):**
-- Image sharing: http://10.42.0.1:5000 (or your hotspot IP)
+- Remote Control: http://10.42.0.1:5000 (or your hotspot IP)
 
 ### Setting up the Printer
 
