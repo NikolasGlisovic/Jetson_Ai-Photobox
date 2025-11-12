@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, send_file
 from camera import Camera
+from printer import Printer  # NEU
 import os
 from datetime import datetime
 from pathlib import Path
@@ -9,7 +10,14 @@ from flask_socketio import SocketIO
 
 app = Flask(__name__)
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+# SocketIO mit besserer Konfiguration für localhost UND Netzwerk
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*",
+    async_mode='threading',
+    logger=True,
+    engineio_logger=True
+)
 
 # Konfiguration
 PHOTO_DIR = Path("static/photos")
@@ -18,12 +26,22 @@ PHOTO_DIR.mkdir(exist_ok=True)
 # Kamera-Instanz (wird lazy initialisiert)
 camera = None
 
+# Drucker-Instanz (wird lazy initialisiert) - NEU
+printer = None
+
 def get_camera():
     """Kamera lazy initialisieren"""
     global camera
     if camera is None:
         camera = Camera()
     return camera
+
+def get_printer():
+    """Drucker lazy initialisieren"""
+    global printer
+    if printer is None:
+        printer = Printer()
+    return printer
 
 @app.route('/')
 def index():
@@ -114,6 +132,60 @@ def download_photo(photo_id):
         )
     return jsonify({'error': 'Foto nicht gefunden'}), 404
 
+# NEU: Drucker-Endpunkte
+@app.route('/api/print/<photo_id>', methods=['POST'])
+def print_photo(photo_id):
+    """
+    Foto drucken
+    
+    Args:
+        photo_id: ID des zu druckenden Fotos
+    """
+    try:
+        filepath = PHOTO_DIR / f"{photo_id}.jpg"
+        
+        if not filepath.exists():
+            return jsonify({
+                'success': False,
+                'error': 'Foto nicht gefunden'
+            }), 404
+        
+        # Drucker holen und drucken
+        printer_instance = get_printer()
+        result = printer_instance.print_image(str(filepath))
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': result['message'],
+                'job_id': result['job_id']
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['message']
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Unerwarteter Fehler: {str(e)}'
+        }), 500
+
+@app.route('/api/printer/status')
+def printer_status():
+    """Drucker-Status abfragen"""
+    try:
+        printer_instance = get_printer()
+        status = printer_instance.get_printer_status()
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({
+            'available': False,
+            'status': 'Fehler',
+            'details': str(e)
+        }), 500
+
 @app.route('/api/cleanup', methods=['POST'])
 def cleanup_old_photos():
     """Alte Fotos löschen (älter als 1 Stunde)"""
@@ -132,19 +204,32 @@ def cleanup_old_photos():
     })
 
 def listen_button():
-    from inputs import get_gamepad
-    print("🎮  Warte auf physische Knopfdrücke...")
-    while True:
-        events = get_gamepad()
-        for event in events:
-            if event.ev_type == "Key" and event.state == 1:
-                print(f"Button gedrückt: {event.code}")
-                socketio.emit("button_pressed")   # 🔔 an Browser senden
+    """Physischen Button überwachen und Events senden"""
+    try:
+        from inputs import get_gamepad
+        print("🎮  Warte auf physische Knopfdrücke...")
+        print("🎮  Erwarteter Event-Code: BTN_TRIGGER")
+        
+        while True:
+            events = get_gamepad()
+            for event in events:
+                # Nur auf Button-Press reagieren (state == 1), nicht auf Release (state == 0)
+                if event.ev_type == "Key" and event.state == 1:
+                    print(f"✓ Button gedrückt: {event.code} (state={event.state})")
+                    
+                    # WebSocket-Event an alle verbundenen Clients senden
+                    socketio.emit("button_pressed", {"code": event.code})
+                    print("📡 WebSocket-Event 'button_pressed' gesendet")
+                    
+    except ImportError:
+        print("⚠ Warning: 'inputs' library nicht gefunden - Button-Funktion deaktiviert")
+        print("   Installiere mit: pip3 install inputs")
+    except Exception as e:
+        print(f"❌ Fehler im Button-Handler: {e}")
 
 
 if __name__ == '__main__':
-
     threading.Thread(target=listen_button, daemon=True).start()
     # Server starten
-    # host='0.0.0.0' macht Server im Netzwerk erreichbar
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # WICHTIG: socketio.run() verwenden, NICHT app.run()!
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)

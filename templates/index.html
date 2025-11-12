@@ -357,10 +357,73 @@
             // Wird später implementiert
         }
 
-        function printPhoto() {
-            alert('Druck-Funktion kommt in Schritt 3! 🖨️');
-            // Wird später implementiert
+        async function printPhoto() {
+            if (!currentPhotoId) {
+                showError('Kein Foto zum Drucken vorhanden');
+                return;
+            }
+            
+            // Button während Druck deaktivieren
+            const printBtn = event.target;
+            printBtn.disabled = true;
+            printBtn.textContent = '🖨️ Drucke...';
+            
+            // Status anzeigen
+            document.getElementById('status').textContent = 'Sende an Drucker...';
+            document.getElementById('loading').style.display = 'block';
+            
+            try {
+                const response = await fetch(`/api/print/${currentPhotoId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Erfolg!
+                    document.getElementById('status').textContent = '✓ Druckauftrag gesendet!';
+                    document.getElementById('status').style.color = '#4CAF50';
+                    
+                    // Kurz Erfolgs-Feedback zeigen
+                    setTimeout(() => {
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('status').style.color = 'white';
+                    }, 3000);
+                    
+                    console.log('Druckauftrag erfolgreich:', data.job_id);
+                } else {
+                    // Fehler vom Server
+                    showError('Druckfehler: ' + data.error);
+                }
+                
+            } catch (error) {
+                showError('Verbindungsfehler: ' + error.message);
+            } finally {
+                // Button wieder aktivieren
+                printBtn.disabled = false;
+                printBtn.textContent = '🖨️ Drucken';
+            }
         }
+
+        // Optional: Drucker-Status beim Laden prüfen
+        async function checkPrinterStatus() {
+            try {
+                const response = await fetch('/api/printer/status');
+                const status = await response.json();
+                
+                if (!status.available) {
+                    console.warn('⚠ Drucker nicht verfügbar:', status.status);
+                    // Optional: Button deaktivieren oder Warnung anzeigen
+                } else {
+                    console.log('✓ Drucker bereit:', status.status);
+                }
+            } catch (error) {
+                console.warn('Drucker-Status konnte nicht geprüft werden:', error);
+            }
+        }
+
+        // Status beim Laden prüfen
+        window.addEventListener('load', checkPrinterStatus);
 
         function resetApp() {
             // Countdown stoppen falls läuft
@@ -402,16 +465,49 @@
         });
     </script>
 
-    <!-- Socket.IO einbinden -->
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+        <!-- Socket.IO einbinden -->
+    <script src="/static/js/socket.io.min.js"></script>
 
     <!-- Verbindung & Event-Listener -->
     <script>
-        const socket = io();
+        // Socket mit expliziter Adresse initialisieren
+        const socket = io('http://127.0.0.1:5000', {
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5
+        });
 
-        socket.on("button_pressed", () => {
-            console.log("🎮 Physischer Button ausgelöst!");
-            startCapture();   // löst denselben Ablauf aus wie Klick auf den UI-Button
+        // Verbindungs-Status überwachen
+        socket.on("connect", () => {
+            console.log("✓ WebSocket verbunden! ID:", socket.id);
+        });
+
+        socket.on("disconnect", (reason) => {
+            console.warn("⚠ WebSocket getrennt:", reason);
+        });
+
+        socket.on("connect_error", (error) => {
+            console.error("❌ WebSocket Verbindungsfehler:", error);
+        });
+
+        // Button-Event empfangen
+        socket.on("button_pressed", (data) => {
+            console.log("🎮 Button-Event empfangen:", data);
+            
+            // Button startet IMMER ein neues Foto
+            // Stoppe laufenden Countdown falls vorhanden
+            if (countdownInterval) {
+                clearInterval(countdownInterval);
+                countdownInterval = null;
+                console.log("⏳ Unterbreche laufenden Countdown");
+            }
+            
+            // Reset und neu starten
+            resetApp();
+            setTimeout(() => {
+                startCapture();
+            }, 100);
         });
     </script>
 
