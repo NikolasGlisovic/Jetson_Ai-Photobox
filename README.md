@@ -195,8 +195,8 @@ sudo usermod -a -G input $USER
 
 ### REMOTE PhotoBox Interface (Port 5000)
 - Connect your mobile device via hotspot
-- go to http://10.42.0.1:5000 (or your hotspot IP)
-- now you can controll the photobox with your remote device from your brwoser
+- Go to http://10.42.0.1:5000 (or your hotspot IP)
+- Now you can controll the photobox with your remote device from your browser
 
 ## 🔧 Configuration
 
