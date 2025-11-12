@@ -228,8 +228,38 @@ def listen_button():
         print(f"❌ Fehler im Button-Handler: {e}")
 
 
+def start_image_server():
+    """Startet den Image-Share-Server auf Port 8080"""
+    try:
+        import subprocess
+        import sys
+        
+        # Starte image_server.py als separaten Prozess
+        print("🌐 Starte Image-Share-Server auf Port 8080...")
+        subprocess.Popen(
+            [sys.executable, "image_server.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        print("✓ Image-Share-Server gestartet!")
+        
+    except Exception as e:
+        print(f"⚠ Warnung: Image-Share-Server konnte nicht gestartet werden: {e}")
+
+
 if __name__ == '__main__':
+    # Image-Share-Server starten
+    start_image_server()
+    
+    # Button-Listener starten
     threading.Thread(target=listen_button, daemon=True).start()
-    # Server starten
-    # WICHTIG: socketio.run() verwenden, NICHT app.run()!
+    
+    # Hauptserver starten
+    print("=" * 60)
+    print("📸 PhotoBox Hauptserver")
+    print("=" * 60)
+    print("🌐 PhotoBox UI: http://127.0.0.1:5000")
+    print("📱 Foto-Sharing: http://127.0.0.1:8080")
+    print("=" * 60)
+    
     socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
