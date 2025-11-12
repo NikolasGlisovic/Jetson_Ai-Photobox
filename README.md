@@ -154,7 +154,7 @@ python3 app.py
 
 ```bash
 # Add Canon SELPHY CP1500 to CUPS
-# Make sure printer is connected via USB and powered on
+# Make sure printer is connected via Hotspot and powered on
 
 # Check if printer is detected
 lpstat -p -d
