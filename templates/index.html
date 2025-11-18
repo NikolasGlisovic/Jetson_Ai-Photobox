@@ -162,6 +162,12 @@
             box-shadow: 0 5px 20px rgba(0,0,0,0.3);
         }
 
+        .action-buttons button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .loading {
             display: none;
             margin-top: 20px;
@@ -227,14 +233,17 @@
         <div class="photo-display" id="photoDisplay">
             <img id="photoImg" src="" alt="Aufgenommenes Foto">
             <div class="action-buttons">
-                <button class="btn-secondary" onclick="processWithAI()">🎨 Mit AI bearbeiten</button>
-                <button class="btn-primary" onclick="printPhoto()">🖨️ Drucken</button>
+                <button class="btn-secondary" id="aiBtn" onclick="processWithAI()">🎨 Mit AI bearbeiten</button>
+                <button class="btn-primary" id="printBtn" onclick="printPhoto()">🖨️ Drucken</button>
                 <button class="btn-danger" onclick="resetApp()">🔄 Neues Foto</button>
             </div>
         </div>
 
         <div class="error" id="error" style="display: none;"></div>
     </div>
+
+    <!-- Socket.IO einbinden -->
+    <script src="/static/js/socket.io.min.js"></script>
 
     <script>
         let currentPhotoId = null;
@@ -352,9 +361,56 @@
             document.getElementById('photoDisplay').style.display = 'block';
         }
 
-        function processWithAI() {
-            alert('AI-Bearbeitung kommt in Schritt 2! 🎨');
-            // Wird später implementiert
+        async function processWithAI() {
+            if (!currentPhotoId) {
+                showError('Kein Foto zum Bearbeiten vorhanden');
+                return;
+            }
+            
+            // Button deaktivieren
+            const aiBtn = document.getElementById('aiBtn');
+            aiBtn.disabled = true;
+            aiBtn.textContent = '🎨 Verarbeite...';
+            
+            // Status & Loading anzeigen
+            document.getElementById('status').textContent = 'AI verarbeitet dein Foto... (ca. 30-60 Sek.)';
+            document.getElementById('loading').style.display = 'block';
+            
+            try {
+                const response = await fetch(`/api/process-ai/${currentPhotoId}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Erfolg! Zeige AI-Bild
+                    currentPhotoId = data.ai_photo_id;
+                    currentPhotoUrl = data.url;
+                    
+                    document.getElementById('status').textContent = `✓ AI-Effekt: ${data.theme}`;
+                    document.getElementById('status').style.color = '#4CAF50';
+                    
+                    // Warte kurz, dann zeige neues Bild
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    showPhoto(data.url);
+                    
+                    setTimeout(() => {
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('status').style.color = 'white';
+                    }, 3000);
+                    
+                    console.log('AI-Verarbeitung erfolgreich:', data.theme);
+                } else {
+                    showError('AI-Fehler: ' + data.error);
+                }
+                
+            } catch (error) {
+                showError('Verbindungsfehler: ' + error.message);
+            } finally {
+                aiBtn.disabled = false;
+                aiBtn.textContent = '🎨 Mit AI bearbeiten';
+            }
         }
 
         async function printPhoto() {
@@ -364,7 +420,7 @@
             }
             
             // Button während Druck deaktivieren
-            const printBtn = event.target;
+            const printBtn = document.getElementById('printBtn');
             printBtn.disabled = true;
             printBtn.textContent = '🖨️ Drucke...';
             
@@ -413,7 +469,6 @@
                 
                 if (!status.available) {
                     console.warn('⚠ Drucker nicht verfügbar:', status.status);
-                    // Optional: Button deaktivieren oder Warnung anzeigen
                 } else {
                     console.log('✓ Drucker bereit:', status.status);
                 }
@@ -463,14 +518,8 @@
                 clearInterval(countdownInterval);
             }
         });
-    </script>
 
-        <!-- Socket.IO einbinden -->
-    <script src="/static/js/socket.io.min.js"></script>
-
-    <!-- Verbindung & Event-Listener -->
-    <script>
-        // Socket mit expliziter Adresse initialisieren
+        // Socket.IO Verbindung & Event-Listener
         const socket = io('http://127.0.0.1:5000', {
             transports: ['websocket', 'polling'],
             reconnection: true,

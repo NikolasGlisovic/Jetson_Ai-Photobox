@@ -1,20 +1,35 @@
 #!/usr/bin/env python3
 """
 Canon SELPHY CP1500 Printer Integration für PhotoBox
+MIT automatischem Branding (Logo + QR-Code)
 """
 import subprocess
 import os
 from PIL import Image
+from pathlib import Path
+from image_branding import ImageBranding
 
 class Printer:
-    def __init__(self, printer_name="Canon_SELPHY_CP1500"):
+    def __init__(self, printer_name="Canon_SELPHY_CP1500", enable_branding=True):
         """
         Drucker initialisieren
         
         Args:
             printer_name: Name des Druckers in CUPS (Standard: Canon_SELPHY_CP1500)
+            enable_branding: Logo + QR-Code automatisch hinzufügen
         """
         self.printer_name = printer_name
+        self.enable_branding = enable_branding
+        
+        # Branding-Modul initialisieren
+        if self.enable_branding:
+            try:
+                self.branding = ImageBranding()
+                print(f"✓ Branding aktiviert (Logo + QR-Code)")
+            except Exception as e:
+                print(f"⚠ Warnung: Branding konnte nicht geladen werden: {e}")
+                self.enable_branding = False
+        
         self._check_printer_available()
     
     def _check_printer_available(self):
@@ -39,6 +54,7 @@ class Printer:
     def print_image(self, image_path, media="photo-4x6", fit_to_page=True):
         """
         Druckt ein Bild auf dem Canon SELPHY CP1500
+        WICHTIG: Fügt automatisch Logo + QR-Code hinzu!
         
         Args:
             image_path: Pfad zum Bild
@@ -56,12 +72,31 @@ class Printer:
                 'job_id': None
             }
         
-        # Bild-Info laden (optional, für Logging)
+        # Bild-Info laden
         try:
             img = Image.open(image_path)
             print(f"Drucke Bild: {os.path.basename(image_path)} ({img.size[0]}x{img.size[1]}px)")
         except Exception as e:
             print(f"Warnung: Bild konnte nicht geladen werden: {e}")
+        
+        # BRANDING HINZUFÜGEN (falls aktiviert)
+        print_path = image_path
+        
+        if self.enable_branding:
+            try:
+                # Temporäre Kopie mit Branding erstellen
+                branded_path = str(Path(image_path).parent / f"_print_{Path(image_path).name}")
+                
+                print(f"\n🎨 Füge Branding hinzu...")
+                self.branding.add_branding(image_path, branded_path)
+                
+                # Diese gebrandete Version drucken
+                print_path = branded_path
+                print(f"✓ Branding erfolgreich hinzugefügt")
+                
+            except Exception as e:
+                print(f"⚠ Warnung: Branding fehlgeschlagen, drucke Original: {e}")
+                print_path = image_path
         
         # Druckoptionen zusammenstellen
         options = []
@@ -72,7 +107,7 @@ class Printer:
         
         # Druckbefehl ausführen
         try:
-            cmd = ['lp', '-d', self.printer_name] + options + [image_path]
+            cmd = ['lp', '-d', self.printer_name] + options + [print_path]
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -81,12 +116,20 @@ class Printer:
                 timeout=10
             )
             
-            # Job-ID aus Ausgabe extrahieren (z.B. "request id is Canon_SELPHY_CP1500-123")
+            # Job-ID aus Ausgabe extrahieren
             job_id = None
             if "request id is" in result.stdout:
                 job_id = result.stdout.split("request id is")[-1].strip()
             
             print(f"✓ Druckauftrag erfolgreich gesendet! Job-ID: {job_id}")
+            
+            # Temporäre gebrandete Datei löschen
+            if self.enable_branding and print_path != image_path:
+                try:
+                    os.remove(print_path)
+                    print(f"✓ Temporäre Druckdatei gelöscht")
+                except:
+                    pass
             
             return {
                 'success': True,
@@ -192,7 +235,11 @@ if __name__ == "__main__":
     status = printer.get_printer_status()
     print(f"\nDrucker-Status: {status}")
     
-    # Test-Druck (optional)
-    # test_image = "/path/to/test.jpg"
-    # result = printer.print_image(test_image)
-    # print(f"\nDruck-Ergebnis: {result}")
+    # Test-Druck mit Branding
+    test_image = "static/photos/test.jpg"  # Ersetze mit echtem Pfad
+    if Path(test_image).exists():
+        print(f"\n🖨️  Starte Test-Druck mit Branding...")
+        result = printer.print_image(test_image)
+        print(f"\nDruck-Ergebnis: {result}")
+    else:
+        print(f"\n⚠️  Test-Bild nicht gefunden: {test_image}")

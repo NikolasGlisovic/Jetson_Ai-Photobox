@@ -1,12 +1,14 @@
 from flask import Flask, render_template, jsonify, send_file
 from camera import Camera
-from printer import Printer  # NEU
+from printer import Printer
+from ai_processor import AIProcessor  # NEU
 import os
 from datetime import datetime
 from pathlib import Path
 import uuid
 import threading
 from flask_socketio import SocketIO
+import shutil
 
 app = Flask(__name__)
 
@@ -26,8 +28,11 @@ PHOTO_DIR.mkdir(exist_ok=True)
 # Kamera-Instanz (wird lazy initialisiert)
 camera = None
 
-# Drucker-Instanz (wird lazy initialisiert) - NEU
+# Drucker-Instanz (wird lazy initialisiert)
 printer = None
+
+# AI Processor-Instanz (wird lazy initialisiert) - NEU
+ai_processor = None
 
 def get_camera():
     """Kamera lazy initialisieren"""
@@ -42,6 +47,13 @@ def get_printer():
     if printer is None:
         printer = Printer()
     return printer
+
+def get_ai_processor():
+    """AI Processor lazy initialisieren"""
+    global ai_processor
+    if ai_processor is None:
+        ai_processor = AIProcessor()
+    return ai_processor
 
 @app.route('/')
 def index():
@@ -132,7 +144,76 @@ def download_photo(photo_id):
         )
     return jsonify({'error': 'Foto nicht gefunden'}), 404
 
-# NEU: Drucker-Endpunkte
+# NEU: AI-Processing Endpunkt
+@app.route('/api/process-ai/<photo_id>', methods=['POST'])
+def process_ai(photo_id):
+    """
+    Verarbeitet ein Foto mit AI
+    
+    Args:
+        photo_id: ID des zu verarbeitenden Fotos
+        
+    Returns:
+        {'success': bool, 'ai_photo_id': str, 'url': str, 'theme': str}
+    """
+    try:
+        input_filepath = PHOTO_DIR / f"{photo_id}.jpg"
+        
+        if not input_filepath.exists():
+            return jsonify({
+                'success': False,
+                'error': 'Foto nicht gefunden'
+            }), 404
+        
+        print(f"\n🎨 Starte AI-Verarbeitung für {photo_id}")
+        
+        # AI Processor holen und verarbeiten
+        processor = get_ai_processor()
+        result = processor.process_image(str(input_filepath))
+        
+        if not result['success']:
+            return jsonify({
+                'success': False,
+                'error': result['message']
+            }), 500
+        
+        # AI-Output zurück in static/photos kopieren
+        ai_photo_id = f"{photo_id}_ai"
+        ai_filename = f"{ai_photo_id}.jpg"
+        ai_filepath = PHOTO_DIR / ai_filename
+        
+        print(f"📋 Kopiere AI-Output: {result['output_path']} → {ai_filepath}")
+        shutil.copy2(result['output_path'], ai_filepath)
+        
+        return jsonify({
+            'success': True,
+            'ai_photo_id': ai_photo_id,
+            'url': f'/static/photos/{ai_filename}',
+            'theme': result['theme'],
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        print(f"❌ AI-Verarbeitung Fehler: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Unerwarteter Fehler: {str(e)}'
+        }), 500
+
+@app.route('/api/ai/status')
+def ai_status():
+    """Prüft ob AI verfügbar ist"""
+    try:
+        processor = get_ai_processor()
+        status = processor.check_availability()
+        return jsonify(status)
+    except Exception as e:
+        return jsonify({
+            'available': False,
+            'message': str(e)
+        }), 500
+
+# Drucker-Endpunkte
 @app.route('/api/print/<photo_id>', methods=['POST'])
 def print_photo(photo_id):
     """
@@ -253,6 +334,17 @@ if __name__ == '__main__':
     
     # Button-Listener starten
     threading.Thread(target=listen_button, daemon=True).start()
+    
+    # AI Status prüfen beim Start
+    try:
+        processor = get_ai_processor()
+        ai_check = processor.check_availability()
+        if ai_check['available']:
+            print("✅ AI-Verarbeitung verfügbar!")
+        else:
+            print(f"⚠️  AI-Verarbeitung nicht verfügbar: {ai_check['message']}")
+    except Exception as e:
+        print(f"⚠️  AI-Verarbeitung konnte nicht geprüft werden: {e}")
     
     # Hauptserver starten
     print("=" * 60)
