@@ -24,19 +24,19 @@
         .container {
             text-align: center;
             padding: 20px;
-            max-width: 900px;
+            max-width: 1400px;
             width: 100%;
         }
 
         h1 {
-            font-size: 3em;
-            margin-bottom: 20px;
+            font-size: 4em;
+            margin-bottom: 30px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
         .subtitle {
-            font-size: 1.2em;
-            margin-bottom: 40px;
+            font-size: 1.5em;
+            margin-bottom: 50px;
             opacity: 0.9;
         }
 
@@ -44,8 +44,8 @@
             background: white;
             color: #667eea;
             border: none;
-            padding: 30px 60px;
-            font-size: 2em;
+            padding: 40px 100px;
+            font-size: 2.5em;
             font-weight: bold;
             border-radius: 50px;
             cursor: pointer;
@@ -73,7 +73,7 @@
             position: relative;
             display: none;
             margin: 40px auto;
-            max-width: 640px;
+            max-width: 1200px;
         }
 
         .preview-container.active {
@@ -101,7 +101,7 @@
         }
 
         .countdown {
-            font-size: 10em;
+            font-size: 15em;
             font-weight: bold;
             text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
             animation: pulse 1s ease-in-out;
@@ -115,10 +115,21 @@
         .photo-display {
             margin-top: 40px;
             display: none;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .photo-display.normal-photo {
+            max-width: 1200px;
+        }
+
+        .photo-display.ai-photo {
+            max-width: 700px;
         }
 
         .photo-display img {
-            max-width: 100%;
+            width: 100%;
+            height: auto;
             border-radius: 20px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.4);
         }
@@ -126,20 +137,40 @@
         .action-buttons {
             margin-top: 30px;
             display: flex;
-            gap: 20px;
+            gap: 15px;
             justify-content: center;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
         }
 
         .action-buttons button {
-            padding: 15px 40px;
-            font-size: 1.2em;
+            padding: 20px 50px;
+            font-size: 1.5em;
             border: none;
             border-radius: 25px;
             cursor: pointer;
             font-weight: bold;
             transition: all 0.3s ease;
             touch-action: manipulation;
+            white-space: nowrap;
+            flex-shrink: 1;
+            min-width: 0;
+        }
+
+        /* Kleinere Buttons für AI-Bilder */
+        .photo-display.ai-photo .action-buttons button {
+            padding: 15px 30px;
+            font-size: 1.2em;
+        }
+
+        /* Für sehr kleine Bildschirme */
+        @media (max-width: 768px) {
+            .action-buttons {
+                flex-wrap: wrap;
+            }
+            .action-buttons button {
+                padding: 15px 30px;
+                font-size: 1.2em;
+            }
         }
 
         .btn-primary {
@@ -177,8 +208,8 @@
             border: 5px solid rgba(255,255,255,0.3);
             border-top: 5px solid white;
             border-radius: 50%;
-            width: 60px;
-            height: 60px;
+            width: 80px;
+            height: 80px;
             animation: spin 1s linear infinite;
             margin: 0 auto;
         }
@@ -190,8 +221,8 @@
 
         .status {
             margin-top: 20px;
-            font-size: 1.2em;
-            min-height: 30px;
+            font-size: 1.5em;
+            min-height: 40px;
         }
 
         .error {
@@ -203,8 +234,8 @@
         }
 
         .camera-ready-text {
-            margin-top: 20px;
-            font-size: 1em;
+            margin-top: 30px;
+            font-size: 1.3em;
             opacity: 0.8;
         }
     </style>
@@ -356,9 +387,19 @@
 
         function showPhoto(url) {
             const photoImg = document.getElementById('photoImg');
+            const photoDisplay = document.getElementById('photoDisplay');
+            
             // Cache-Busting mit Timestamp UND Random für neue Fotos
             photoImg.src = url + '?t=' + Date.now() + '&r=' + Math.random();
-            document.getElementById('photoDisplay').style.display = 'block';
+            
+            // CSS-Klasse setzen basierend auf Bildtyp
+            if (url.includes('_ai')) {
+                photoDisplay.className = 'photo-display ai-photo';
+            } else {
+                photoDisplay.className = 'photo-display normal-photo';
+            }
+            
+            photoDisplay.style.display = 'block';
         }
 
         async function processWithAI() {
